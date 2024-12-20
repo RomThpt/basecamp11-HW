@@ -27,8 +27,8 @@ const Page: FC = () => {
 
   // Step 3 --> Read from a contract -- Start
   const contractAddress = "0x01fad1e1f56a10310e6f8fccd47060a31281204620dafce52065dbd38000ffee";
-  const { data: readData, refetch: dataRefetch, isError: readIsError, isLoading: readIsLoading, error: readError } = useReadContract({
-    functionName: "get_balance",
+  const { data: readData, refetch: dataRefetch, isLoading: readIsLoading, error: readError } = useReadContract({
+    functionName: "get_counter",
     args: [],
     abi: ABI as Abi,
     address: contractAddress,
@@ -41,7 +41,6 @@ const Page: FC = () => {
   const [amount, setAmount] = useState<number | ''>(0);
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    console.log("Form submitted with amount ", amount);
     writeAsync();
   };
   const typedABI = ABI as Abi;
@@ -53,9 +52,9 @@ const Page: FC = () => {
     if (!userAddress || !contract) return [];
     const safeAmount = amount || 0;
     try {
-      return [contract.populate("increase_balance", [safeAmount])];
+      return [contract.populate("increase_counter", [safeAmount])];
     } catch (error) {
-      console.error("Error populating increase_balance call:", error);
+      console.error("Error populating increase_counter call:", error);
       return [];
     }
   }, [contract, userAddress, amount]);
@@ -109,12 +108,12 @@ const Page: FC = () => {
   // Step 4 --> Write to a contract -- End
 
   // Step 5 --> Reset balance -- Start
-  const resetBalanceCall = useMemo(() => {
+  const resetCounterCall = useMemo(() => {
     if (!contract) return undefined;
     try {
-      return contract.populate("reset_balance");
+      return contract.populate("reset_counter");
     } catch (error) {
-      console.error("Error populating reset_balance call:", error);
+      console.error("Error populating reset_counter call:", error);
       return undefined;
     }
   }, [contract]);
@@ -123,7 +122,7 @@ const Page: FC = () => {
     isPending: resetIsPending,
     data: resetData,
   } = useSendTransaction({
-    calls: resetBalanceCall ? [resetBalanceCall] : [],
+    calls: resetCounterCall ? [resetCounterCall] : [],
   });
   // Step 5 --> Reset balance -- End
 
@@ -208,7 +207,7 @@ const Page: FC = () => {
             <h3 className="text-lg font-bold mb-2">Reset Balance</h3>
             <button
               onClick={() => resetBalance()}
-              disabled={resetIsPending || !resetBalanceCall || !userAddress}
+              disabled={resetIsPending || !resetCounterCall || !userAddress}
               className="mt-2 border border-black text-black font-regular py-2 px-4 bg-yellow-300 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               {resetIsPending ? <LoadingState message="Resetting..." /> : "Reset Balance"}
@@ -227,8 +226,8 @@ const Page: FC = () => {
 
           {/* Step 3 --> Read from a contract -- Start */}
           <div className="p-4 bg-white border-black border">
-            <h3 className="text-lg font-bold mb-2">Contract Balance</h3>
-            <p>Balance: {readData?.toString()}</p>
+            <h3 className="text-lg font-bold mb-2">Contract Counter</h3>
+            <p>Counter: {readData?.toString()}</p>
             <button
               onClick={() => dataRefetch()}
               className="mt-2 border border-black text-black font-regular py-1 px-3 bg-yellow-300 hover:bg-yellow-500"
@@ -240,15 +239,7 @@ const Page: FC = () => {
 
           {/* Step 4 --> Write to a contract -- Start */}
           <form onSubmit={handleSubmit} className="bg-white p-4 border-black border">
-            <h3 className="text-lg font-bold mb-2">Write to Contract</h3>
-            <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Amount:</label>
-            <input
-              type="number"
-              id="amount"
-              value={amount}
-              onChange={handleAmountChange}
-              className="block w-full px-3 py-2 text-sm leading-6 border-black focus:outline-none focus:border-yellow-300 black-border-p"
-            />
+            <h3 className="text-lg font-bold mb-2">Increase Counter</h3>
             <button
               type="submit"
               className="mt-3 border border-black text-black font-regular py-2 px-4 bg-yellow-300 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
@@ -270,30 +261,23 @@ const Page: FC = () => {
           {/* Step 4 --> Write to a contract -- End */}
 
           {/* Step 6 --> Get events from a contract -- Start */}
-          <div className="p-4 bg-white border-black border">
-            <h3 className="text-lg font-bold mb-2">
-              Contract Events ({events.length})
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="border-b border-gray-300 text-left p-2 font-semibold">Sender</th>
-                    <th className="border-b border-gray-300 text-right p-2 font-semibold">Added</th>
-                    <th className="border-b border-gray-300 text-right p-2 font-semibold">New Balance</th>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="border-b border-gray-300 text-left p-2 font-semibold">#</th>
+                  <th className="border-b border-gray-300 text-right p-2 font-semibold">New Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lastFiveEvents.map((event, index) => (
+                  <tr key={index} className={'bg-gray-50'}>
+                    <td className="border-b border-gray-200 p-2">{lastFiveEvents.length - index}</td>
+                    <td className="border-b border-gray-200 p-2 text-right">{event.data.length>0 ? formatAmount(event.data[0]) : 'Value: 0' }</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {lastFiveEvents.map((event, index) => (
-                    <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
-                      <td className="border-b border-gray-200 p-2">{shortenAddress(event.keys[1])}</td>
-                      <td className="border-b border-gray-200 p-2 text-right">{formatAmount(event.data[0])}</td>
-                      <td className="border-b border-gray-200 p-2 text-right">{formatAmount(event.data[2])}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
           {/* Step 6 --> Get events from a contract -- End */}
 
